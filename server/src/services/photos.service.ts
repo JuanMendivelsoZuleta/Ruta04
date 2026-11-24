@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { AppError } from "../lib/http";
 import { prisma } from "../lib/prisma";
 import { withRecordNotFound } from "../lib/prisma-errors";
-import { removeStoredFile, toStoragePath } from "../lib/storage";
+import { removeStoredFile, removeStoredFiles, uploadPhotoFile } from "../lib/storage";
 import type { PhotoListQuery, PhotoUpdateInput } from "../lib/validation";
 import { ensureEventExists } from "./event.service";
 
@@ -20,7 +20,8 @@ export function listPhotos(filters: PhotoListQuery) {
     where.available = filters.available;
   }
   if (filters.code) {
-    where.code = { contains: filters.code };
+    // Búsqueda insensible a mayúsculas/minúsculas (PostgreSQL).
+    where.code = { contains: filters.code, mode: "insensitive" };
   }
 
   return prisma.photo.findMany({
@@ -44,9 +45,9 @@ export async function getPhotoById(id: string) {
 }
 
 /**
- * Crea una o varias fotografías para un evento. Los archivos ya fueron
- * guardados por multer; el handler de la ruta limpia los archivos si esta
- * operación falla.
+ * Crea una o varias fotografías para un evento. Los archivos llegan en memoria
+ * (multer); se suben a Cloudinary y se guarda la URL pública. Si algo falla, se
+ * eliminan los assets ya subidos para no dejar huérfanos.
  */
 export async function createPhotos(
   eventId: string,
@@ -69,14 +70,22 @@ export async function createPhotos(
   }
 
   const codes = buildCodes(files.length, code);
+  const uploadedUrls: string[] = [];
 
   try {
+    // 1) Subir cada archivo a Cloudinary (almacenamiento persistente).
+    for (const file of files) {
+      const url = await uploadPhotoFile(file);
+      uploadedUrls.push(url);
+    }
+
+    // 2) Registrar las fotografías guardando la URL pública de Cloudinary.
     return await prisma.$transaction(
-      files.map((file, index) =>
+      uploadedUrls.map((url, index) =>
         prisma.photo.create({
           data: {
             eventId,
-            storagePath: toStoragePath(file.filename),
+            storagePath: url,
             code: codes[index],
             price,
             available: true,
@@ -85,6 +94,8 @@ export async function createPhotos(
       ),
     );
   } catch (error) {
+    // Evita assets huérfanos en Cloudinary si la inserción falla.
+    await removeStoredFiles(uploadedUrls);
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"

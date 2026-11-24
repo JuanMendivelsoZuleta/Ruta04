@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma";
 
 /**
  * Prueba de integración real del CRUD de eventos sobre el servidor Express y
- * la base SQLite. Levanta la app en un puerto efímero, ejercita los endpoints
+ * la base PostgreSQL. Levanta la app en un puerto efímero, ejercita los endpoints
  * con fetch y limpia los datos creados.
  */
 
@@ -117,7 +117,7 @@ async function run(): Promise<void> {
       "el listado incluye el evento creado",
     );
 
-    // Búsqueda por nombre (case-insensitive en SQLite)
+    // Búsqueda por nombre (case-insensitive en PostgreSQL)
     const byName = await request("GET", `/api/events?q=${encodeURIComponent(`evento ${unique}`)}`);
     const byNameBody = byName.body as { data?: Array<{ id: string }> };
     check(

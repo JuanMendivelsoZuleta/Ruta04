@@ -1,9 +1,6 @@
-import { existsSync, readdirSync } from "node:fs";
 import type { AddressInfo } from "node:net";
-import path from "node:path";
 import { app } from "../app";
 import { prisma } from "../lib/prisma";
-import { UPLOAD_DIR } from "../lib/storage";
 
 /**
  * Prueba de integración real de fotografías: subida multipart con archivos
@@ -41,14 +38,6 @@ type PhotoRow = {
   available: boolean;
 };
 
-function fileCount(): number {
-  return readdirSync(UPLOAD_DIR).length;
-}
-
-function diskFileExists(storagePath: string): boolean {
-  return existsSync(path.join(UPLOAD_DIR, path.basename(storagePath)));
-}
-
 async function run(): Promise<void> {
   const server = app.listen(0);
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -58,7 +47,6 @@ async function run(): Promise<void> {
   const unique = Date.now();
   const eventName = `TEST Fotos ${unique}`;
   let eventId: string | undefined;
-  const baselineFiles = fileCount();
 
   const request = async (
     method: string,
@@ -133,12 +121,8 @@ async function run(): Promise<void> {
       "precio y disponibilidad guardados correctamente",
     );
     check(
-      batchPhotos.every((photo) => photo.storagePath.startsWith("/uploads/")),
-      "storagePath apunta a /uploads/",
-    );
-    check(
-      batchPhotos.every((photo) => diskFileExists(photo.storagePath)),
-      "los archivos existen físicamente en disco",
+      batchPhotos.every((photo) => photo.storagePath.startsWith("https://")),
+      "storagePath es una URL pública de Cloudinary",
     );
 
     // 2. Galería del evento y listados
@@ -161,15 +145,15 @@ async function run(): Promise<void> {
     check(detail.status === 200 && detailBody?.data?.id === firstPhoto.id, "GET /api/photos/:id responde 200");
 
     // 4. Archivo servido desde el servidor
-    const served = await fetch(`${base}${firstPhoto.storagePath}`);
+    const served = await fetch(firstPhoto.storagePath);
     const servedBuffer = Buffer.from(await served.arrayBuffer());
-    check(served.status === 200, "la imagen se sirve en /uploads", served.status);
+    check(served.status === 200, "la imagen se sirve desde Cloudinary", served.status);
     check(
-      served.headers.get("content-type")?.startsWith("image/png") ?? false,
-      "la imagen se sirve con content-type image/png",
+      served.headers.get("content-type")?.startsWith("image/") ?? false,
+      "la imagen se sirve con content-type image/*",
       served.headers.get("content-type"),
     );
-    check(servedBuffer.length === PNG_BYTES.length, "el contenido servido coincide con el archivo");
+    check(servedBuffer.length > 0, "el contenido de la imagen no está vacío");
 
     // 5. Código explícito y unicidad
     const explicit = await upload(
@@ -184,24 +168,20 @@ async function run(): Promise<void> {
       explicitBody?.data?.[0]?.code,
     );
 
-    const beforeDuplicate = fileCount();
     const duplicate = await upload(
       eventId!,
       { price: "1000", code: "MI-CODIGO-1" },
       [{ content: PNG_BYTES, filename: "duplicada.png", type: "image/png" }],
     );
     check(duplicate.status === 409, "código duplicado responde 409", duplicate.status);
-    check(fileCount() === beforeDuplicate, "no quedan archivos huérfanos tras el 409");
 
     // 6. Validación de tipo y tamaño
-    const beforeInvalid = fileCount();
     const invalidType = await upload(
       eventId!,
       { price: "1000" },
       [{ content: Buffer.from("no soy una imagen"), filename: "archivo.txt", type: "text/plain" }],
     );
     check(invalidType.status === 400, "archivo .txt responde 400", invalidType.status);
-    check(fileCount() === beforeInvalid, "no quedan archivos huérfanos tras tipo inválido");
 
     const gif = await upload(
       eventId!,
@@ -218,14 +198,12 @@ async function run(): Promise<void> {
     check(oversized.status === 400, "archivo >5MB responde 400", oversized.status);
 
     // 7. Evento inexistente -> 404 y sin huérfanos
-    const beforeMissingEvent = fileCount();
     const missingEvent = await upload(
       "evento-no-existe",
       { price: "1000" },
       [{ content: PNG_BYTES, filename: "huerfana.png", type: "image/png" }],
     );
     check(missingEvent.status === 404, "subida a evento inexistente responde 404", missingEvent.status);
-    check(fileCount() === beforeMissingEvent, "no quedan archivos huérfanos tras evento inexistente");
 
     // 8. Edición de precio y disponibilidad
     const updated = await request("PATCH", `/api/photos/${firstPhoto.id}`, {
@@ -249,10 +227,8 @@ async function run(): Promise<void> {
     check(updateMissing.status === 404, "PATCH de foto inexistente responde 404", updateMissing.status);
 
     // 9. Eliminar foto (registro + archivo)
-    const pathToDelete = firstPhoto.storagePath;
     const deleted = await request("DELETE", `/api/photos/${firstPhoto.id}`);
     check(deleted.status === 204, "DELETE /api/photos/:id responde 204", deleted.status);
-    check(!diskFileExists(pathToDelete), "el archivo físico se elimina del disco");
 
     const deleteAgain = await request("DELETE", `/api/photos/${firstPhoto.id}`);
     check(deleteAgain.status === 404, "DELETE repetido responde 404", deleteAgain.status);
@@ -269,7 +245,6 @@ async function run(): Promise<void> {
     const deletedEvent = await request("DELETE", `/api/events/${eventId}`);
     check(deletedEvent.status === 204, "DELETE del evento responde 204", deletedEvent.status);
     eventId = undefined;
-    check(fileCount() === baselineFiles, "no quedan archivos huérfanos tras borrar el evento", fileCount());
   } finally {
     if (eventId) {
       await request("DELETE", `/api/events/${eventId}`).catch(() => undefined);

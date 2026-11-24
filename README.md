@@ -166,7 +166,8 @@ En carreras, maratones, competencias de ciclismo y otros eventos, los participan
 | Express | 5.3.0 |
 | TypeScript | 5.9.3 |
 | Prisma Client / CLI | 6.19.3 |
-| SQLite | vía Prisma |
+| PostgreSQL | Neon (vía Prisma) |
+| Cloudinary | almacenamiento de fotografías |
 | multer | 2.5.0 |
 | tsx | 4.23.15 |
 
@@ -181,27 +182,28 @@ En carreras, maratones, competencias de ciclismo y otros eventos, los participan
 
 ## Arquitectura
 
-Monolito sencillo: una SPA React servida por el mismo servidor Express que expone la API y las imágenes.
+Monolito sencillo en desarrollo; en despliegue se separan frontend (Vercel) y backend (Render).
 
 ```
 Navegador
   │
-  ├── React SPA (client/dist) ── servida por Express en producción
+  ├── React SPA (client/dist) ── Vercel
   │
-  ├── /api/*     → Express 5 + Prisma 6 → SQLite (server/prisma/dev.db)
-  └── /uploads/* → archivos locales (server/uploads)
+  ├── /api/*  → Express 5 + Prisma 6 → PostgreSQL (Neon)
+  └── fotos   → Cloudinary (URLs públicas, guardadas en la BD)
 ```
 
-- **Desarrollo:** Vite en `:5173` con proxy de `/api` y `/uploads` hacia Express en `:4000`.
-- **Producción local:** Express en `:4000` sirve API, `/uploads` y `client/dist` (con fallback SPA para rutas profundas).
-- **Persistencia:** SQLite (un archivo) + archivos locales. Sin servicios cloud en runtime.
+- **Desarrollo:** Vite en `:5173` con proxy de `/api` hacia Express en `:4000`.
+- **Producción local:** Express en `:4000` sirve API y `client/dist` (con fallback SPA para rutas profundas).
+- **Despliegue:** frontend en Vercel, backend en Render, PostgreSQL en Neon y fotografías en Cloudinary. Ver [`DEPLOY.md`](DEPLOY.md).
+- **Persistencia:** PostgreSQL (Neon) + Cloudinary; no depende del disco efímero del hosting.
 - **Autenticación:** no implementada. El “modo fotógrafo” es un acceso de demostración.
 
 ---
 
 ## Modelo de datos
 
-SQLite no soporta `enum` nativo: `sportCategory` y `status` se modelan como `String` y se validan en la aplicación. Los montos (`price`, `subtotal`, `total`) son enteros en pesos COP sin decimales.
+Los `enum` se modelan como `String` y se validan en la aplicación (compatible con PostgreSQL). Los montos (`price`, `subtotal`, `total`) son enteros en pesos COP sin decimales.
 
 | Modelo | Campos principales | Restricciones |
 |---|---|---|
@@ -222,8 +224,7 @@ SQLite no soporta `enum` nativo: `sportCategory` y `status` se modelan como `Str
 **Estados de pedido:** `PENDING`, `COMPLETED`, `CANCELLED`.
 
 Migraciones en `server/prisma/migrations/`:
-- `20261124014219_init`
-- `20261124021000_order_item_unique`
+- `20261124000000_init` (PostgreSQL)
 
 ---
 
@@ -244,7 +245,7 @@ Ruta04/
 │   ├── vite.config.ts          # proxy /api y /uploads
 │   └── vitest.config.ts
 ├── server/                     # API Express + Prisma + SQLite
-│   ├── prisma/                 # schema, migraciones, dev.db (generado)
+│   ├── prisma/                 # schema y migraciones (PostgreSQL en despliegue)
 │   ├── src/
 │   │   ├── lib/                # prisma, storage, validación, errores
 │   │   ├── routes/             # events, event-photos, photos, orders
@@ -312,11 +313,16 @@ npx playwright install chromium
 
 ```env
 PORT=4000
-DATABASE_URL="file:./dev.db"
-# UPLOAD_DIR=./uploads   # opcional; por defecto server/uploads
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/DB?sslmode=require"
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+CORS_ORIGIN=http://localhost:5173
 ```
 
-- `DATABASE_URL` es relativa al schema de Prisma (`server/prisma/dev.db`).
+- `DATABASE_URL` es la connection string **directa** de PostgreSQL (Neon).
+- `CLOUDINARY_*` almacena las fotografías de forma persistente.
+- `CORS_ORIGIN` permite el dominio del frontend (lista separada por comas).
 - `PORT` es el puerto de Express (por defecto 4000).
 - No se deben versionar secretos: `.env` está en `.gitignore`.
 
@@ -326,8 +332,8 @@ DATABASE_URL="file:./dev.db"
 VITE_API_BASE=
 ```
 
-- Vacío = mismo origen. En desarrollo, el proxy de Vite redirige `/api` y `/uploads` a `http://localhost:4000`.
-- Solo se necesita para apuntar a una API en otro origen.
+- Vacío = mismo origen. En desarrollo, el proxy de Vite redirige `/api` a `http://localhost:4000`.
+- En producción (Vercel) debe apuntar a la URL pública del backend, p. ej. `https://ruta04-api.onrender.com`.
 
 ---
 
@@ -384,20 +390,16 @@ Ejecuta:
 
 ## Deployment
 
-**Estado real:** el build de producción fue comprobado **localmente** y Express sirve `client/dist` correctamente. **No se ha desplegado en ningún proveedor de hosting**; no existe URL pública ni pipeline de CI/CD.
+**Estado real:** la configuración de despliegue gratuito está preparada (PostgreSQL, Cloudinary, CORS y archivos de configuración), pero **aún no se ha ejecutado**; no existe URL pública hasta crear las cuentas y desplegar. Guía completa en [`DEPLOY.md`](DEPLOY.md).
 
-Para ejecutarlo en un servidor propio:
+| Componente | Servicio gratuito |
+|---|---|
+| Frontend (React/Vite) | Vercel (Hobby) |
+| Backend (Express) | Suga (Free, sin tarjeta) |
+| Base de datos | Neon (PostgreSQL) |
+| Fotografías | Cloudinary |
 
-1. Node.js ≥ 20 y npm.
-2. Copiar el repositorio e instalar dependencias.
-3. Configurar `server/.env` (`PORT`, `DATABASE_URL`).
-4. `npm run build && npm run seed && npm start`.
-5. Mantener persistencia de:
-   - `server/prisma/dev.db` (base SQLite),
-   - `server/uploads/` (archivos).
-6. Usar un proxy inverso con HTTPS y un gestor de procesos (fuera del alcance del MVP).
-
-> No afirmar un despliegue en hosting mientras no se ejecute y verifique.
+> El backend se despliega como contenedor (Dockerfile) en un host gratuito sin tarjeta (Suga). No afirmar un despliegue hasta ejecutarlo y verificarlo.
 
 ---
 
@@ -509,6 +511,8 @@ npm --prefix server run e2e:cleanup
 
 ### Resultados reales (noviembre de 2026)
 
+> Resultados de la ejecución local previa con SQLite. Tras la migración a PostgreSQL/Cloudinary deben re-ejecutarse contra Neon y Cloudinary.
+
 | Suite | Resultado |
 |---|---|
 | Unitarias (`Vitest`) | **3 archivos · 8 tests passed** |
@@ -532,14 +536,14 @@ Los E2E cubren: búsqueda/filtros, galería, lightbox, carrito, validación de c
 
 - **Sin autenticación ni roles reales**: el modo fotógrafo es DEMO y no protege datos.
 - **Sin pagos reales** ni pasarela; los pedidos son DEMO.
-- **SQLite local**: adecuado para una demo de un solo proceso; no para múltiples instancias/serverless.
-- **Archivos en disco local** (`server/uploads`): requiere disco persistente; no hay CDN ni almacenamiento cloud.
+- **Backend gratuito (Render Free)**: se suspende tras 15 min sin tráfico; la primera petición tarda ~1 min.
+- **Límites gratuitos**: Neon (1 GB PostgreSQL, 100 CU-horas/mes) y Cloudinary (25 créditos/mes). Ver [`DEPLOY.md`](DEPLOY.md).
 - **Carrito por dispositivo** (`localStorage`): no se sincroniza entre navegadores/dispositivos.
 - **Búsqueda por tildes**: SQLite `LIKE` es insensible a mayúsculas en ASCII pero sensible a tildes (`Triatlón` ≠ `Triatlon`).
 - **Validación de imágenes por MIME + extensión**, sin inspección profunda del contenido ni miniaturas/redimensionado.
 - **Una misma fotografía puede comprarse en pedidos distintos**; la disponibilidad la controla el fotógrafo. Solo se evitan duplicados dentro del mismo pedido.
 - **E2E solo en Chromium**; sin auditoría de accesibilidad profunda.
-- **Sin despliegue en hosting** (solo build local comprobado).
+- **Despliegue preparado pero no ejecutado** (ver [`DEPLOY.md`](DEPLOY.md)); no hay URL pública verificada todavía.
 - `npm audit` reporta alertas en dependencias de la **CLI de Prisma** (dev); no afectan el runtime del servidor.
 
 ---

@@ -18,12 +18,12 @@ async function main(): Promise<void> {
   console.log("== Verificación de persistencia Ruta 04 ==\n");
 
   // 1. Conexión y tablas creadas por la migración
-  const tables = await prisma.$queryRaw<Array<{ name: string }>>`
-    SELECT name FROM sqlite_master
-    WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
-    ORDER BY name
+  const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`
+    SELECT tablename FROM pg_tables
+    WHERE schemaname = 'public'
+    ORDER BY tablename
   `;
-  const tableNames = tables.map((t) => t.name);
+  const tableNames = tables.map((t) => t.tablename);
   console.log("Tablas:", tableNames.join(", "));
   for (const expected of ["Event", "Photo", "Order", "OrderItem"]) {
     assert(tableNames.includes(expected), `existe la tabla ${expected}`);

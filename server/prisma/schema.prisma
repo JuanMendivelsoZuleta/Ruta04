@@ -9,7 +9,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  // PostgreSQL (Neon) en despliegue: almacenamiento persistente fuera del
+  // disco efímero de los servicios gratuitos.
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

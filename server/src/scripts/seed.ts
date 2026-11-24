@@ -1,17 +1,18 @@
 import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
 import { prisma } from "../lib/prisma";
-import { UPLOAD_DIR } from "../lib/storage";
+import { uploadBufferToCloudinary } from "../lib/storage";
 
 /**
  * Carga idempotente de datos DEMO.
  *
  * - 4 eventos ficticios (claramente identificados como DEMO).
  * - 4 categorías deportivas y 24 fotografías (6 por evento).
- * - Intenta descargar fotografías deportivas reales desde Wikimedia Commons
- *   (licencias libres) y las guarda en server/uploads. Si la descarga falla
- *   (sin red, 404, formato inválido), genera un placeholder SVG local marcado
- *   como DEMO. En ningún caso se presentan como fotos de eventos reales.
+ * - Intenta reutilizar imágenes ya descargadas en `server/uploads` (caché local
+ *   de la máquina que ejecuta el seed); si no existen, las descarga desde
+ *   Wikimedia Commons y, si falla la red, genera un placeholder SVG local.
+ * - Cada imagen se sube a Cloudinary y se guarda su URL pública en la BD, de
+ *   modo que las fotografías sobreviven a reinicios y nuevos despliegues.
  * - Los IDs son deterministas: re-ejecutar el seed no duplica registros.
  */
 
@@ -85,6 +86,12 @@ const DEMO_EVENTS: DemoEvent[] = [
 const USER_AGENT = "Ruta04Demo/1.0 (MVP academico; imagenes de demostracion)";
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".svg"];
 
+/** Caché local opcional de imágenes ya descargadas (server/uploads). */
+const LOCAL_UPLOAD_DIR = path.resolve(__dirname, "../../uploads");
+
+/** Cloudinary: carpeta donde se guardan las imágenes DEMO. */
+const CLOUDINARY_DEMO_FOLDER = "ruta04/demo";
+
 const PALETTES: Record<SportCategory, [string, string]> = {
   RUNNING: ["#0b1220", "#a3e635"],
   CYCLING: ["#0f172a", "#22d3ee"],
@@ -105,8 +112,10 @@ type PhotoSpec = {
   url: string | null;
 };
 
+type ImagePayload = { buffer: Buffer; format: string };
+
 type ResolvedPhoto = PhotoSpec & {
-  filename: string;
+  secureUrl: string;
   source: "wikimedia" | "local" | "fallback";
 };
 
@@ -120,6 +129,11 @@ function photoId(slug: string, index: number): string {
 
 function photoCode(slug: string, index: number): string {
   return `DEMO-${slug.toUpperCase()}-${pad(index + 1)}`;
+}
+
+function formatFromFilename(filename: string): string {
+  const extension = path.extname(filename).toLowerCase();
+  return extension === ".jpeg" || extension === ".jpg" ? "jpg" : extension.replace(".", "");
 }
 
 function escapeXml(value: string): string {
@@ -136,7 +150,7 @@ function escapeXml(value: string): string {
 function findExistingImage(baseName: string): string | null {
   for (const extension of IMAGE_EXTENSIONS) {
     const filename = `${baseName}${extension}`;
-    if (existsSync(path.join(UPLOAD_DIR, filename))) {
+    if (existsSync(path.join(LOCAL_UPLOAD_DIR, filename))) {
       return filename;
     }
   }
@@ -185,8 +199,8 @@ async function fetchCandidateUrls(searchTerm: string, limit: number): Promise<st
   }
 }
 
-/** Descarga una imagen y la guarda localmente; null si algo falla. */
-async function downloadImage(url: string, baseName: string): Promise<string | null> {
+/** Descarga una imagen y la devuelve en memoria; null si algo falla. */
+async function downloadImage(url: string): Promise<ImagePayload | null> {
   try {
     const response = await fetch(url, {
       headers: { "User-Agent": USER_AGENT },
@@ -199,18 +213,28 @@ async function downloadImage(url: string, baseName: string): Promise<string | nu
     if (!contentType.startsWith("image/")) {
       return null;
     }
-    const extension = contentType.includes("png")
-      ? ".png"
+    const format = contentType.includes("png")
+      ? "png"
       : contentType.includes("webp")
-        ? ".webp"
-        : ".jpg";
+        ? "webp"
+        : contentType.includes("svg")
+          ? "svg"
+          : "jpg";
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.length < 1024) {
       return null;
     }
-    const filename = `${baseName}${extension}`;
-    await fs.writeFile(path.join(UPLOAD_DIR, filename), buffer);
-    return filename;
+    return { buffer, format };
+  } catch {
+    return null;
+  }
+}
+
+/** Lee una imagen ya descargada en el caché local; null si no existe. */
+async function readLocalImage(filename: string): Promise<ImagePayload | null> {
+  try {
+    const buffer = await fs.readFile(path.join(LOCAL_UPLOAD_DIR, filename));
+    return { buffer, format: formatFromFilename(filename) };
   } catch {
     return null;
   }
@@ -238,15 +262,11 @@ function fallbackSvg(event: DemoEvent, index: number, code: string): string {
 </svg>`;
 }
 
-async function writeFallback(
-  event: DemoEvent,
-  index: number,
-  code: string,
-  baseName: string,
-): Promise<string> {
-  const filename = `${baseName}.svg`;
-  await fs.writeFile(path.join(UPLOAD_DIR, filename), fallbackSvg(event, index, code), "utf8");
-  return filename;
+function fallbackPayload(event: DemoEvent, index: number, code: string): ImagePayload {
+  return {
+    buffer: Buffer.from(fallbackSvg(event, index, code), "utf8"),
+    format: "svg",
+  };
 }
 
 function countSources(photos: ResolvedPhoto[]): Record<ResolvedPhoto["source"], number> {
@@ -298,28 +318,45 @@ async function main(): Promise<void> {
     }
   });
 
-  // 3. Resolver archivos: reutilizar local, descargar o generar fallback
+  // 3. Resolver el contenido: caché local → descarga → placeholder SVG
   const resolved = await Promise.all(
     specs.map(async (spec): Promise<ResolvedPhoto> => {
+      let payload: ImagePayload | null = null;
+      let source: ResolvedPhoto["source"] = "fallback";
+
       const existing = findExistingImage(spec.baseName);
       if (existing) {
-        return { ...spec, filename: existing, source: "local" };
-      }
-      if (spec.url) {
-        const downloaded = await downloadImage(spec.url, spec.baseName);
-        if (downloaded) {
-          return { ...spec, filename: downloaded, source: "wikimedia" };
+        payload = await readLocalImage(existing);
+        if (payload) {
+          source = "local";
         }
       }
-      const fallback = await writeFallback(spec.event, spec.index, spec.code, spec.baseName);
-      return { ...spec, filename: fallback, source: "fallback" };
+      if (!payload && spec.url) {
+        payload = await downloadImage(spec.url);
+        if (payload) {
+          source = "wikimedia";
+        }
+      }
+      if (!payload) {
+        payload = fallbackPayload(spec.event, spec.index, spec.code);
+        source = "fallback";
+      }
+
+      // public_id determinista: re-ejecutar el seed sobrescribe sin duplicar.
+      const secureUrl = await uploadBufferToCloudinary(payload.buffer, {
+        publicId: `demo-${spec.event.slug}-${pad(spec.index + 1)}`,
+        folder: CLOUDINARY_DEMO_FOLDER,
+        format: payload.format,
+      });
+
+      return { ...spec, secureUrl, source };
     }),
   );
 
   // 4. Persistir eventos y fotografías (upsert idempotente)
   for (const event of DEMO_EVENTS) {
     const eventPhotos = resolved.filter((photo) => photo.event.id === event.id);
-    const coverImage = eventPhotos[0] ? `/uploads/${eventPhotos[0].filename}` : null;
+    const coverImage = eventPhotos[0]?.secureUrl ?? null;
     const eventData = {
       name: event.name,
       sportCategory: event.sportCategory,
@@ -339,7 +376,7 @@ async function main(): Promise<void> {
     for (const photo of eventPhotos) {
       const photoData = {
         eventId: event.id,
-        storagePath: `/uploads/${photo.filename}`,
+        storagePath: photo.secureUrl,
         code: photo.code,
         price: photo.price,
         available: photo.available,
@@ -364,7 +401,7 @@ async function main(): Promise<void> {
     `\nDEMO listo: ${eventCount} eventos, ${photoCount} fotografías, ${DEMO_EVENTS.length} categorías.`,
   );
   console.log(
-    `Imágenes: ${sources.wikimedia} descargadas de Wikimedia Commons, ${sources.local} reutilizadas, ${sources.fallback} placeholders SVG locales.`,
+    `Imágenes: ${sources.wikimedia} descargadas de Wikimedia Commons, ${sources.local} del caché local, ${sources.fallback} placeholders SVG.`,
   );
   console.log("Las imágenes son ilustrativas de demostración; no corresponden a los eventos ficticios.");
 }

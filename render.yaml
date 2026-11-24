@@ -1,0 +1,28 @@
+# Blueprint de Render para el backend de Ruta 04.
+# Crea un Web Service gratuito a partir de este repositorio.
+# Las variables marcadas con `sync: false` se piden en el panel de Render y no
+# se guardan en el repositorio (secretos).
+services:
+  - type: web
+    name: ruta04-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install --include=dev && npx prisma generate && npm run build
+    startCommand: npm run start:deploy
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false

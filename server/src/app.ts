@@ -4,7 +4,6 @@ import path from "node:path";
 import express from "express";
 import { errorHandler, notFoundHandler } from "./lib/http";
 import { prisma } from "./lib/prisma";
-import { UPLOAD_DIR, UPLOAD_URL_PREFIX } from "./lib/storage";
 import { eventPhotosRouter } from "./routes/event-photos";
 import { eventsRouter } from "./routes/events";
 import { ordersRouter } from "./routes/orders";
@@ -12,10 +11,31 @@ import { photosRouter } from "./routes/photos";
 
 export const app = express();
 
-app.use(express.json());
+// CORS: en producción el frontend (Vercel) y la API (Render) viven en dominios
+// distintos. Solo se permiten los orígenes indicados en CORS_ORIGIN
+// (lista separada por comas). Si la variable está vacía, no se envía cabecera
+// CORS y solo funcionará el mismo origen (útil en desarrollo local).
+const CORS_ORIGINS = (process.env.CORS_ORIGIN ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-// Sirve las imágenes almacenadas localmente en server/uploads
-app.use(UPLOAD_URL_PREFIX, express.static(UPLOAD_DIR));
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && CORS_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  }
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
+
+app.use(express.json());
 
 app.get("/api/health", async (_req, res) => {
   try {
@@ -44,7 +64,7 @@ if (existsSync(CLIENT_DIST)) {
       next();
       return;
     }
-    if (req.path.startsWith("/api") || req.path.startsWith(UPLOAD_URL_PREFIX)) {
+    if (req.path.startsWith("/api")) {
       next();
       return;
     }

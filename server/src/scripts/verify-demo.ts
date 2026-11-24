@@ -1,10 +1,7 @@
-import { existsSync } from "node:fs";
 import type { AddressInfo } from "node:net";
-import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { app } from "../app";
 import { prisma } from "../lib/prisma";
-import { UPLOAD_DIR } from "../lib/storage";
 
 /**
  * Verificación integral de los datos DEMO y de los flujos del backend:
@@ -126,14 +123,12 @@ async function run(): Promise<void> {
       "hay fotografías disponibles y no disponibles",
     );
     check(
-      allPhotos.every((photo) =>
-        existsSync(path.join(UPLOAD_DIR, path.basename(photo.storagePath))),
-      ),
-      "todas las imágenes existen físicamente en disco",
+      allPhotos.every((photo) => photo.storagePath.startsWith("https://")),
+      "todas las imágenes tienen URL pública de Cloudinary",
     );
 
     for (const photo of allPhotos.slice(0, 4)) {
-      const response = await fetch(`${base}${photo.storagePath}`);
+      const response = await fetch(photo.storagePath);
       check(
         response.status === 200 &&
           (response.headers.get("content-type") ?? "").startsWith("image/"),

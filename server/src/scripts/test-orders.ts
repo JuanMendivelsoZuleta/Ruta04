@@ -1,14 +1,12 @@
-import { readdirSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { PrismaClient } from "@prisma/client";
 import { app } from "../app";
 import { prisma } from "../lib/prisma";
-import { UPLOAD_DIR } from "../lib/storage";
 
 /**
  * Prueba de integración real de pedidos DEMO: selección de fotos, cálculo en
  * backend, validaciones, consulta por correo y persistencia tras cerrar y
- * reabrir la conexión a la base SQLite.
+ * reabrir la conexión a PostgreSQL.
  */
 
 let passed = 0;
@@ -45,10 +43,6 @@ type OrderRow = {
   items: OrderItemRow[];
 };
 
-function fileCount(): number {
-  return readdirSync(UPLOAD_DIR).length;
-}
-
 async function run(): Promise<void> {
   const server = app.listen(0);
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -58,7 +52,6 @@ async function run(): Promise<void> {
   const unique = Date.now();
   const eventName = `TEST Pedidos ${unique}`;
   const customerEmail = `comprador.${unique}@example.com`;
-  const baselineFiles = fileCount();
   let eventId: string | undefined;
 
   const request = async (
@@ -265,7 +258,6 @@ async function run(): Promise<void> {
     const deletedEvent = await request("DELETE", `/api/events/${eventId}`);
     check(deletedEvent.status === 204, "evento de prueba eliminado (204)", deletedEvent.status);
     eventId = undefined;
-    check(fileCount() === baselineFiles, "no quedan archivos huérfanos", fileCount());
 
     const remainingOrders = await prisma.order.count({ where: { customerEmail } });
     check(remainingOrders === 0, "no quedan pedidos de prueba", remainingOrders);

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { removeStoredFiles, toStoragePath, uploadPhotos } from "../lib/storage";
+import { uploadPhotos } from "../lib/storage";
 import { parsePhotoUploadFields } from "../lib/validation";
 import * as photoService from "../services/photos.service";
 
@@ -12,19 +12,14 @@ eventPhotosRouter.get("/:eventId/photos", async (req, res) => {
   res.json({ data: photos, count: photos.length });
 });
 
-// Subir una o varias fotografías y asociarlas al evento
+// Subir una o varias fotografías y asociarlas al evento.
+// multer mantiene los archivos en memoria y el servicio los sube a Cloudinary;
+// si algo falla, el propio servicio limpia los assets ya subidos.
 eventPhotosRouter.post("/:eventId/photos", uploadPhotos, async (req, res) => {
   const eventId = String(req.params.eventId);
   const files = Array.isArray(req.files) ? req.files : [];
 
-  try {
-    const { price, code } = parsePhotoUploadFields(req.body);
-    const photos = await photoService.createPhotos(eventId, files, price, code);
-    res.status(201).json({ data: photos, count: photos.length });
-  } catch (error) {
-    // Si la validación o la inserción fallan, se eliminan los archivos ya
-    // escritos por multer para no dejar huérfanos.
-    await removeStoredFiles(files.map((file) => toStoragePath(file.filename)));
-    throw error;
-  }
+  const { price, code } = parsePhotoUploadFields(req.body);
+  const photos = await photoService.createPhotos(eventId, files, price, code);
+  res.status(201).json({ data: photos, count: photos.length });
 });

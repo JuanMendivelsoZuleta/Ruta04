@@ -11,6 +11,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "start:deploy": "prisma migrate deploy && node dist/index.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -29,6 +30,7 @@
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
+    "cloudinary": "^2.11.0",
     "express": "5.3.0",
     "multer": "^2.5.0"
   },
