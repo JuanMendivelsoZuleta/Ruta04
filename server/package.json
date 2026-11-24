@@ -21,7 +21,8 @@
     "verify:demo": "tsx src/scripts/verify-demo.ts",
     "test:events": "tsx src/scripts/test-events.ts",
     "test:photos": "tsx src/scripts/test-photos.ts",
-    "test:orders": "tsx src/scripts/test-orders.ts"
+    "test:orders": "tsx src/scripts/test-orders.ts",
+    "e2e:cleanup": "tsx src/scripts/e2e-cleanup.ts"
   },
   "prisma": {
     "seed": "tsx src/scripts/seed.ts"

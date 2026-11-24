@@ -13,9 +13,13 @@
     "start": "npm --prefix server start",
     "seed": "npm --prefix server run db:seed",
     "verify:demo": "npm --prefix server run verify:demo",
-    "test:backend": "npm --prefix server run verify && npm --prefix server run verify:demo && npm --prefix server run test:events && npm --prefix server run test:photos && npm --prefix server run test:orders"
+    "test:backend": "npm --prefix server run verify && npm --prefix server run verify:demo && npm --prefix server run test:events && npm --prefix server run test:photos && npm --prefix server run test:orders",
+    "test:unit": "npm --prefix client run test",
+    "test:e2e": "npm run build && npm run seed && playwright test",
+    "test:all": "npm run test:unit && npm run test:e2e"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "concurrently": "10.0.7"
   }
 }
