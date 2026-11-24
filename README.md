@@ -395,11 +395,11 @@ Ejecuta:
 | Componente | Servicio gratuito |
 |---|---|
 | Frontend (React/Vite) | Vercel (Hobby) |
-| Backend (Express) | Render (Free Web Service) |
+| Backend (Express) | Suga (Free, sin tarjeta) |
 | Base de datos | Neon (PostgreSQL) |
 | Fotografías | Cloudinary |
 
-> Render Free suspende el backend tras 15 min de inactividad (la primera petición tarda ~1 min). No afirmar un despliegue hasta ejecutarlo y verificarlo.
+> El backend se despliega como contenedor (Dockerfile) en un host gratuito sin tarjeta (Suga). No afirmar un despliegue hasta ejecutarlo y verificarlo.
 
 ---
 

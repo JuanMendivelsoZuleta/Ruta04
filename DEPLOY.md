@@ -8,22 +8,22 @@ Profesor
   ├─ https://<proyecto>.vercel.app      → React (Vite)          [Vercel]
   │        │  fetch(VITE_API_BASE + /api/...)
   │        ▼
-  ├─ https://ruta04-api.onrender.com    → Express + Prisma      [Render]
+  ├─ https://<servicio>.suga.app        → Express + Prisma      [Suga]
   │        ├─ PostgreSQL                                     [Neon]
   │        └─ fotografías (URLs públicas)                    [Cloudinary]
   └─ <img src="https://res.cloudinary.com/...">
 ```
 
 - **0 COP**, sin tarjeta, sin pruebas que cobren después.
-- Persistencia: la base de datos y las fotos viven fuera del disco efímero de Render.
-- Limitación principal: Render duerme el backend tras 15 min de inactividad; la primera petición tarda ~1 min.
+- Persistencia: la base de datos y las fotos viven fuera del disco efímero del host (Neon + Cloudinary).
+- Limitación principal: algunos hosts gratuitos duermen el backend por inactividad (cold start de ~1 min). Suga Free es siempre encendido.
 
 ---
 
 ## Requisitos
 
 - Cuenta de GitHub con este repositorio.
-- Cuentas gratuitas: [Vercel](https://vercel.com), [Render](https://render.com), [Neon](https://neon.tech), [Cloudinary](https://cloudinary.com).
+- Cuentas gratuitas: [Vercel](https://vercel.com), [Suga](https://suga.app), [Neon](https://neon.tech), [Cloudinary](https://cloudinary.com).
 - Node.js ≥ 20 y npm en tu máquina (solo para ejecutar la migración y el seed una vez).
 
 ---
@@ -35,7 +35,7 @@ Profesor
    ```
    postgresql://USUARIO:CLAVE@ep-xxxx.us-east-1.aws.neon.tech/neondb?sslmode=require
    ```
-3. Esa cadena será `DATABASE_URL` (en local y en Render). **No la compartas ni la subas al repositorio.**
+3. Esa cadena será `DATABASE_URL` (en local y en el host del backend). **No la compartas ni la subas al repositorio.**
 
 ## Paso 2 — Fotografías (Cloudinary)
 
@@ -67,20 +67,30 @@ Profesor
    npm --prefix server run verify
    ```
 
-## Paso 4 — Backend en Render
+## Paso 4 — Backend (host sin tarjeta)
 
-1. **New → Blueprint** y selecciona este repositorio (usa `render.yaml`), o crea un **Web Service** manual con:
-   - **Root Directory:** `server`
-   - **Build Command:** `npm install --include=dev && npx prisma generate && npm run build`
-   - **Start Command:** `npm run start:deploy`
-   - **Plan:** Free
-2. Variables de entorno (Environment):
-   - `DATABASE_URL` (la de Neon)
+### Opción A (recomendada): Suga — sin tarjeta y siempre encendido
+
+1. Entra a https://suga.app e inicia sesión con **GitHub**. Elige el plan **Free**
+   (NO inicies la prueba de 14 días de los planes de pago).
+2. Crea un **proyecto** (p. ej. `ruta04`) y añade un **servicio desde tu repositorio**:
+   - Repositorio: `JuanMendivelsoZuleta/Ruta04`, rama `main`.
+   - Suga detecta el `Dockerfile` de la raíz y compila `server/`.
+3. Variables de entorno del servicio (las mismas de `server/.env`):
+   - `DATABASE_URL` = cadena directa de Neon
    - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
-   - `CORS_ORIGIN` (la URL de Vercel; se puede ajustar después del Paso 5)
-   - `NODE_ENV=production`
-3. Deploy. Verifica: `https://ruta04-api.onrender.com/api/health` → `{"status":"ok","database":"connected"}`.
-   > La primera petición puede tardar ~1 min (cold start).
+   - `CORS_ORIGIN` = `http://localhost:5173` (temporal; se ajusta en el Paso 6)
+   - `NODE_ENV` = `production`
+4. Deploy y espera a que el servicio esté **Live**. Abre:
+   `https://<tu-servicio>.suga.app/api/health` → debe responder `{"status":"ok","database":"connected"}`.
+
+> El contenedor ejecuta `prisma migrate deploy` al arrancar (idempotente) y luego el servidor.
+
+### Opción B: Render (solo si no te pide tarjeta)
+
+Usa `render.yaml` o un Web Service con Root Directory `server`, build
+`npm install --include=dev && npx prisma generate && npm run build` y start
+`npm run start:deploy`. La primera petición tarda ~1 min (cold start).
 
 ## Paso 5 — Frontend en Vercel
 
@@ -94,7 +104,7 @@ Profesor
 
 ## Paso 6 — Cerrar CORS
 
-1. En Render, actualiza `CORS_ORIGIN` con la URL exacta de Vercel (sin `/` final).
+1. En el host del backend (Suga/Render), actualiza `CORS_ORIGIN` con la URL exacta de Vercel (sin `/` final).
    Ejemplo: `https://ruta04.vercel.app`. Si hay dominio propio, agrégalo separado por coma.
 2. Redeploy del backend. Sin esto, el navegador bloqueará las peticiones del frontend.
 
@@ -106,7 +116,7 @@ Profesor
 - [ ] Búsqueda por nombre/ubicación y por código (`DEMO-RUN-01`).
 - [ ] Carrito y compra DEMO generan un pedido `DEMO-...`.
 - [ ] Panel del fotógrafo: crear evento, subir foto, editar precio/disponibilidad, eliminar.
-- [ ] **Persistencia:** crea un pedido → en Render haz *Restart* del servicio → el pedido sigue ahí.
+- [ ] **Persistencia:** crea un pedido → en el host haz *Restart/Redeploy* del servicio → el pedido sigue ahí.
 - [ ] Las fotos siguen disponibles tras el reinicio.
 - [ ] Rutas profundas (`/events`, `/photographer`) cargan al refrescar (rewrite SPA).
 
@@ -122,7 +132,7 @@ Profesor
 ## Paso 9 — Manual para el profesor
 
 1. Abrir la URL de Vercel.
-2. Si es la primera visita tras un rato, **esperar ~1 minuto** (Render está despertando).
+2. Si es la primera visita tras un rato, **esperar ~1 minuto** (el backend está despertando).
 3. Explorar **Eventos** → abrir uno → ver galería → ampliar una foto.
 4. Probar **buscar por código**: `DEMO-RUN-01`, `DEMO-CYC-01`, `DEMO-TRI-01`, `DEMO-SWI-01`.
 5. Agregar fotos al carrito → **Checkout DEMO** (nombre y correo) → confirmación.
@@ -132,7 +142,8 @@ Profesor
 
 ## Limitaciones del plan gratuito
 
-- **Render Free:** duerme tras 15 min sin tráfico (cold start ~1 min) y usa disco efímero (por eso la BD y las fotos son externas).
+- **Host del backend:** Suga Free es siempre encendido (sin cold start), con 256 MB RAM y 0.1 vCPU. Su disco es efímero; por eso la BD (Neon) y las fotos (Cloudinary) son externas.
+- **Render Free** (alternativa): duerme tras 15 min sin tráfico (cold start ~1 min).
 - **Neon Free:** 1 GB PostgreSQL, 100 CU-horas/mes; el cómputo se suspende a los 5 min y despierta al instante.
 - **Cloudinary Free:** 25 créditos/mes (1 crédito = 1 GB almacenado o 1 GB servido o 1000 transformaciones), máx 10 MB/imagen.
 - **Vercel Hobby:** 100 GB de transferencia/mes; uso **no comercial** (el MVP académico lo cumple).
@@ -142,5 +153,5 @@ Profesor
 ## Volver a desplegar
 
 - **Frontend:** push a la rama conectada → Vercel reconstruye.
-- **Backend:** push a la rama conectada → Render reconstruye y ejecuta `prisma migrate deploy` al iniciar.
+- **Backend:** push a la rama conectada → el host reconstruye la imagen y ejecuta `prisma migrate deploy` al iniciar.
 - **Datos:** no se borran; viven en Neon y Cloudinary.
