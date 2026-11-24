@@ -305,3 +305,72 @@ export function parsePhotoListQuery(query: Record<string, unknown>): PhotoListQu
 
   return filters;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Pedidos DEMO                                                              */
+/* ------------------------------------------------------------------------- */
+
+/** Datos validados para crear un pedido DEMO. */
+export type OrderCreateInput = {
+  customerName: string;
+  customerEmail: string;
+  photoIds: string[];
+};
+
+/** Filtro de consulta de pedidos por correo. */
+export type OrderListQuery = {
+  email: string;
+};
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_ORDER_PHOTOS = 50;
+
+function readEmail(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw badRequest([`${field} es obligatorio`]);
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(normalized)) {
+    throw badRequest([`${field} no es un correo válido`]);
+  }
+  return normalized;
+}
+
+/** Valida los datos del comprador y los IDs de fotografía seleccionados. */
+export function parseCreateOrder(body: unknown): OrderCreateInput {
+  const data = requireRecord(body);
+  const customerName = readRequiredString(data.customerName, "customerName", {
+    min: 2,
+    max: 120,
+  });
+  const customerEmail = readEmail(data.customerEmail, "customerEmail");
+
+  const rawIds = data.photoIds;
+  if (!Array.isArray(rawIds) || rawIds.length === 0) {
+    throw badRequest([
+      "photoIds debe ser un arreglo con al menos una fotografía",
+    ]);
+  }
+  if (rawIds.length > MAX_ORDER_PHOTOS) {
+    throw badRequest([
+      `No se pueden comprar más de ${MAX_ORDER_PHOTOS} fotografías por pedido`,
+    ]);
+  }
+
+  const ids: string[] = [];
+  for (const rawId of rawIds) {
+    if (typeof rawId !== "string" || rawId.trim() === "") {
+      throw badRequest(["Cada elemento de photoIds debe ser un ID válido"]);
+    }
+    ids.push(rawId.trim());
+  }
+
+  // Deduplicación defensiva: la misma foto no se cobra ni se guarda dos veces.
+  const photoIds = [...new Set(ids)];
+  return { customerName, customerEmail, photoIds };
+}
+
+/** Valida el correo requerido para consultar pedidos. */
+export function parseOrderListQuery(query: Record<string, unknown>): OrderListQuery {
+  return { email: readEmail(query.email, "email") };
+}

@@ -5,6 +5,7 @@ import { prisma } from "./lib/prisma";
 import { UPLOAD_DIR, UPLOAD_URL_PREFIX } from "./lib/storage";
 import { eventPhotosRouter } from "./routes/event-photos";
 import { eventsRouter } from "./routes/events";
+import { ordersRouter } from "./routes/orders";
 import { photosRouter } from "./routes/photos";
 
 export const app = express();
@@ -30,6 +31,7 @@ app.get("/api/health", async (_req, res) => {
 app.use("/api/events", eventPhotosRouter);
 app.use("/api/events", eventsRouter);
 app.use("/api/photos", photosRouter);
+app.use("/api/orders", ordersRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

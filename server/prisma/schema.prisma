@@ -74,6 +74,7 @@ model OrderItem {
   // preservar la integridad del historial de compras DEMO.
   photo Photo @relation(fields: [photoId], references: [id], onDelete: Restrict)
 
-  @@index([orderId])
+  // Evita fotos repetidas dentro de un mismo pedido.
+  @@unique([orderId, photoId])
   @@index([photoId])
 }

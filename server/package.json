@@ -18,7 +18,8 @@
     "db:studio": "prisma studio",
     "verify": "tsx src/scripts/verify.ts",
     "test:events": "tsx src/scripts/test-events.ts",
-    "test:photos": "tsx src/scripts/test-photos.ts"
+    "test:photos": "tsx src/scripts/test-photos.ts",
+    "test:orders": "tsx src/scripts/test-orders.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
