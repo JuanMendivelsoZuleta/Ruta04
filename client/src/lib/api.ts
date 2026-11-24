@@ -1,0 +1,71 @@
+import type { ApiErrorBody, ApiItem, ApiList, EventItem, Photo } from '@/types/api'
+
+const BASE_URL = import.meta.env.VITE_API_BASE ?? ''
+
+export class ApiError extends Error {
+  readonly status: number
+  readonly details?: string[]
+
+  constructor(status: number, message: string, details?: string[]) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.details = details
+  }
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers)
+  if (init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
+  let response: Response
+  try {
+    response = await fetch(`${BASE_URL}${path}`, { ...init, headers })
+  } catch {
+    throw new ApiError(
+      0,
+      'No se pudo conectar con el servidor. Verifica que el backend esté en ejecución.',
+    )
+  }
+
+  if (response.status === 204) {
+    return undefined as T
+  }
+
+  const text = await response.text()
+  const body = text ? (JSON.parse(text) as unknown) : undefined
+
+  if (!response.ok) {
+    const errorBody = body as ApiErrorBody | undefined
+    throw new ApiError(
+      response.status,
+      errorBody?.error ?? 'Ocurrió un error inesperado',
+      errorBody?.details,
+    )
+  }
+
+  return body as T
+}
+
+export const api = {
+  get: <T>(path: string) => request<T>(path),
+  post: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+  patch: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+}
+
+export const eventsApi = {
+  list: (params: { q?: string; sport?: string } = {}) => {
+    const search = new URLSearchParams()
+    if (params.q) search.set('q', params.q)
+    if (params.sport) search.set('sport', params.sport)
+    const query = search.toString()
+    return api.get<ApiList<EventItem>>(`/api/events${query ? `?${query}` : ''}`)
+  },
+  get: (id: string) => api.get<ApiItem<EventItem>>(`/api/events/${id}`),
+  photos: (id: string) => api.get<ApiList<Photo>>(`/api/events/${id}/photos`),
+}

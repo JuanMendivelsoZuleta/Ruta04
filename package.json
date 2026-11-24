@@ -1,0 +1,21 @@
+{
+  "name": "ruta04",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MVP académico Ruta 04 — marketplace de fotografía deportiva",
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c blue,green \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix server run build && npm --prefix client run build",
+    "build:server": "npm --prefix server run build",
+    "build:client": "npm --prefix client run build",
+    "start": "npm --prefix server start",
+    "seed": "npm --prefix server run db:seed",
+    "verify:demo": "npm --prefix server run verify:demo",
+    "test:backend": "npm --prefix server run verify && npm --prefix server run verify:demo && npm --prefix server run test:events && npm --prefix server run test:photos && npm --prefix server run test:orders"
+  },
+  "devDependencies": {
+    "concurrently": "10.0.7"
+  }
+}
