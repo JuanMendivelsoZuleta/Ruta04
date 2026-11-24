@@ -39,7 +39,15 @@ test('flujo del deportista: búsqueda, galería, carrito, compra DEMO y bibliote
   await expect(page.getByText('DEMO-RUN-01').first()).toBeVisible()
   await page.getByRole('link', { name: 'Ir a checkout' }).click()
 
-  // Checkout DEMO
+  // Checkout DEMO: validación local antes de enviar
+  await page.getByRole('button', { name: 'Completar compra DEMO' }).click()
+  await expect(
+    page.getByText('Ingresa tu nombre (mínimo 2 caracteres).'),
+  ).toBeVisible()
+  await expect(
+    page.getByText('Ingresa un correo electrónico válido.'),
+  ).toBeVisible()
+
   await page.getByLabel('Nombre').fill('Comprador E2E')
   await page.getByLabel('Correo electrónico').fill(email)
   await page.getByRole('button', { name: 'Completar compra DEMO' }).click()

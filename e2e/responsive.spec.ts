@@ -22,5 +22,8 @@ test('navegación móvil sin desbordamiento horizontal', async ({ page }) => {
   )
   expect(overflow).toBeLessThanOrEqual(1)
 
+  await page.goto('/ruta-inexistente')
+  await expect(page.getByText('Página no encontrada')).toBeVisible()
+
   expect(consoleErrors).toEqual([])
 })
