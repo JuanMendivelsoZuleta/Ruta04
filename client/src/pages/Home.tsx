@@ -3,13 +3,14 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { EventCard } from '@/components/events/EventCard'
 import { Container } from '@/components/layout/Container'
+import { PhotoTile } from '@/components/photos/PhotoTile'
 import { Badge } from '@/components/ui/Badge'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { LinkButton } from '@/components/ui/LinkButton'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useApi } from '@/hooks/useApi'
-import type { ApiList, EventItem } from '@/types/api'
+import type { ApiList, EventItem, Photo } from '@/types/api'
 
 const steps = [
   {
@@ -31,9 +32,16 @@ const steps = [
 
 export function Home() {
   const { data, loading, error, reload } = useApi<ApiList<EventItem>>('/api/events')
+  const {
+    data: photosData,
+    loading: photosLoading,
+    error: photosError,
+    reload: reloadPhotos,
+  } = useApi<ApiList<Photo>>('/api/photos?available=true')
   const [heroFailed, setHeroFailed] = useState(false)
 
   const events = data?.data.slice(0, 3) ?? []
+  const photos = photosData?.data.slice(0, 8) ?? []
   const heroImage = events[0]?.coverImage ?? null
 
   return (
@@ -124,6 +132,64 @@ export function Home() {
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {events.map((event) => (
                   <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </Container>
+      </section>
+
+      <section className="border-t border-line bg-panel/20 py-14 sm:py-20">
+        <Container>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+                Fotografías
+              </p>
+              <h2 className="mt-2 font-display text-3xl font-bold uppercase tracking-wide text-white sm:text-4xl">
+                Momentos para ampliar
+              </h2>
+            </div>
+            <Link
+              to="/events"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-slate-300 transition-colors hover:text-white"
+            >
+              Ver eventos
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          </div>
+
+          <div className="mt-8">
+            {photosLoading ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {[0, 1, 2, 3, 4, 5, 6, 7].map((item) => (
+                  <Skeleton key={item} className="aspect-[4/3]" />
+                ))}
+              </div>
+            ) : null}
+
+            {!photosLoading && photosError ? (
+              <ErrorState message={photosError} onRetry={reloadPhotos} />
+            ) : null}
+
+            {!photosLoading && !photosError && photos.length === 0 ? (
+              <EmptyState
+                icon={Images}
+                title="Aún no hay fotografías"
+                description="Cuando los fotógrafos publiquen imágenes DEMO, aparecerán aquí."
+              />
+            ) : null}
+
+            {!photosLoading && !photosError && photos.length > 0 ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {photos.map((photo) => (
+                  <Link
+                    key={photo.id}
+                    to={`/events/${photo.eventId}`}
+                    className="block transition-transform hover:-translate-y-0.5"
+                  >
+                    <PhotoTile photo={photo} />
+                  </Link>
                 ))}
               </div>
             ) : null}

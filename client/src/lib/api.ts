@@ -1,4 +1,11 @@
-import type { ApiErrorBody, ApiItem, ApiList, EventItem, Photo } from '@/types/api'
+import type {
+  ApiErrorBody,
+  ApiItem,
+  ApiList,
+  EventItem,
+  Order,
+  Photo,
+} from '@/types/api'
 
 const BASE_URL = import.meta.env.VITE_API_BASE ?? ''
 
@@ -68,4 +75,27 @@ export const eventsApi = {
   },
   get: (id: string) => api.get<ApiItem<EventItem>>(`/api/events/${id}`),
   photos: (id: string) => api.get<ApiList<Photo>>(`/api/events/${id}/photos`),
+}
+
+export const photosApi = {
+  get: (id: string) => api.get<ApiItem<Photo>>(`/api/photos/${id}`),
+  list: (params: { eventId?: string; available?: boolean } = {}) => {
+    const search = new URLSearchParams()
+    if (params.eventId) search.set('eventId', params.eventId)
+    if (params.available !== undefined) search.set('available', String(params.available))
+    const query = search.toString()
+    return api.get<ApiList<Photo>>(`/api/photos${query ? `?${query}` : ''}`)
+  },
+}
+
+export const ordersApi = {
+  create: (input: {
+    customerName: string
+    customerEmail: string
+    photoIds: string[]
+  }) => api.post<ApiItem<Order>>('/api/orders', input),
+  listByEmail: (email: string) =>
+    api.get<ApiList<Order>>(`/api/orders?email=${encodeURIComponent(email)}`),
+  get: (orderNumber: string) =>
+    api.get<ApiItem<Order>>(`/api/orders/${encodeURIComponent(orderNumber)}`),
 }

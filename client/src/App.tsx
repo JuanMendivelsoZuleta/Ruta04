@@ -7,6 +7,7 @@ import { EventsPage } from '@/pages/EventsPage'
 import { Home } from '@/pages/Home'
 import { LibraryPage } from '@/pages/LibraryPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { OrderDetailPage } from '@/pages/OrderDetailPage'
 import { PhotographerPage } from '@/pages/PhotographerPage'
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
         <Route path="cart" element={<CartPage />} />
         <Route path="checkout" element={<CheckoutPage />} />
         <Route path="library" element={<LibraryPage />} />
+        <Route path="orders/:orderNumber" element={<OrderDetailPage />} />
         <Route path="photographer" element={<PhotographerPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

@@ -2,6 +2,7 @@ import { Aperture, Menu, ShoppingBag, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link, NavLink } from 'react-router'
 import { Badge } from '@/components/ui/Badge'
+import { useCart } from '@/context/cart-context'
 import { cn } from '@/lib/cn'
 
 const links = [
@@ -19,6 +20,7 @@ function navLinkClass({ isActive }: { isActive: boolean }): string {
 
 export function Navbar() {
   const [open, setOpen] = useState(false)
+  const { count } = useCart()
   const close = () => setOpen(false)
 
   return (
@@ -49,10 +51,15 @@ export function Navbar() {
         <div className="hidden items-center gap-3 md:flex">
           <Link
             to="/cart"
-            aria-label="Carrito"
-            className="grid size-10 place-items-center rounded-xl border border-line-strong text-slate-300 transition-colors hover:border-accent/60 hover:text-white"
+            aria-label={`Carrito (${count})`}
+            className="relative grid size-10 place-items-center rounded-xl border border-line-strong text-slate-300 transition-colors hover:border-accent/60 hover:text-white"
           >
             <ShoppingBag className="size-5" aria-hidden="true" />
+            {count > 0 ? (
+              <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-ink">
+                {count}
+              </span>
+            ) : null}
           </Link>
           <Link
             to="/photographer"
@@ -93,7 +100,7 @@ export function Navbar() {
               </NavLink>
             ))}
             <NavLink to="/cart" className={navLinkClass} onClick={close}>
-              Carrito
+              Carrito{count > 0 ? ` (${count})` : ''}
             </NavLink>
             <NavLink to="/photographer" className={navLinkClass} onClick={close}>
               Modo fotógrafo (DEMO)

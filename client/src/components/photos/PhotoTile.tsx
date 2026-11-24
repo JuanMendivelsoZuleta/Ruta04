@@ -7,13 +7,14 @@ import type { Photo } from '@/types/api'
 export type PhotoTileProps = {
   photo: Photo
   className?: string
+  onSelect?: (photo: Photo) => void
 }
 
-export function PhotoTile({ photo, className }: PhotoTileProps) {
+export function PhotoTile({ photo, className, onSelect }: PhotoTileProps) {
   return (
     <figure
       className={cn(
-        'group overflow-hidden rounded-2xl border border-line bg-panel',
+        'group relative overflow-hidden rounded-2xl border border-line bg-panel',
         className,
       )}
     >
@@ -37,6 +38,15 @@ export function PhotoTile({ photo, className }: PhotoTileProps) {
           {formatPrice(photo.price)}
         </span>
       </figcaption>
+
+      {onSelect ? (
+        <button
+          type="button"
+          onClick={() => onSelect(photo)}
+          aria-label={`Ampliar fotografía ${photo.code}`}
+          className="absolute inset-0 z-10 rounded-2xl transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+        />
+      ) : null}
     </figure>
   )
 }

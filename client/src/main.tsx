@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import { Toaster } from '@/components/feedback/Toaster'
 import { ToastProvider } from '@/components/feedback/ToastProvider'
+import { CartProvider } from '@/context/CartProvider'
 import App from './App'
 import './styles/index.css'
 
@@ -15,8 +16,10 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <ToastProvider>
-        <App />
-        <Toaster />
+        <CartProvider>
+          <App />
+          <Toaster />
+        </CartProvider>
       </ToastProvider>
     </BrowserRouter>
   </StrictMode>,
