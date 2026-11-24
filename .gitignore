@@ -21,6 +21,7 @@ server/uploads/
 
 # Logs y sistema
 *.log
+*.pid
 .DS_Store
 Thumbs.db
 
