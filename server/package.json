@@ -16,7 +16,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
-    "verify": "tsx src/scripts/verify.ts"
+    "verify": "tsx src/scripts/verify.ts",
+    "test:events": "tsx src/scripts/test-events.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

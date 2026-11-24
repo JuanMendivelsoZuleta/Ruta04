@@ -9,8 +9,10 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
  */
 export const prisma =
   globalForPrisma.prisma ??
+  // El errorHandler de la app registra los errores inesperados. Evitamos que
+  // Prisma duplique el log de errores esperados (p. ej. P2025 -> 404).
   new PrismaClient({
-    log: process.env.NODE_ENV === "production" ? ["error"] : ["warn", "error"],
+    log: process.env.NODE_ENV === "production" ? [] : ["warn"],
   });
 
 if (process.env.NODE_ENV !== "production") {
