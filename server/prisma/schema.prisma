@@ -1,0 +1,79 @@
+// Esquema de datos del MVP Ruta 04.
+// SQLite no soporta enums nativos: las categorías y estados se modelan como
+// String y se validan en la capa de aplicación (src/lib/domain.ts).
+// Los montos (price, subtotal, total) se guardan como enteros en pesos COP
+// sin decimales, evitando errores de punto flotante.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id            String   @id @default(cuid())
+  name          String
+  sportCategory String
+  location      String
+  date          DateTime
+  description   String?
+  coverImage    String?
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  photos Photo[]
+
+  @@index([sportCategory])
+  @@index([status])
+}
+
+model Photo {
+  id          String   @id @default(cuid())
+  eventId     String
+  storagePath String
+  code        String   @unique
+  price       Int
+  available   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([eventId])
+  @@index([available])
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  orderNumber   String   @unique
+  customerName  String
+  customerEmail String
+  subtotal      Int
+  total         Int
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now())
+
+  items OrderItem[]
+
+  @@index([customerEmail])
+  @@index([status])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  photoId String
+  price   Int
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Restrict: impide borrar una fotografía ya incluida en un pedido, para
+  // preservar la integridad del historial de compras DEMO.
+  photo Photo @relation(fields: [photoId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([photoId])
+}

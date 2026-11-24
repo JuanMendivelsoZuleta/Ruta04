@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment (secretos fuera del código)
+.env
+.env.*
+!.env.example
+
+# SQLite (base de datos local de la demo)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+
+# Uploads locales de la demo
+server/uploads/
+
+# Logs y sistema
+*.log
+.DS_Store
+Thumbs.db
