@@ -15,11 +15,16 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset --force",
+    "db:seed": "tsx src/scripts/seed.ts",
     "db:studio": "prisma studio",
     "verify": "tsx src/scripts/verify.ts",
+    "verify:demo": "tsx src/scripts/verify-demo.ts",
     "test:events": "tsx src/scripts/test-events.ts",
     "test:photos": "tsx src/scripts/test-photos.ts",
     "test:orders": "tsx src/scripts/test-orders.ts"
+  },
+  "prisma": {
+    "seed": "tsx src/scripts/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
