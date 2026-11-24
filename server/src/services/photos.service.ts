@@ -19,6 +19,9 @@ export function listPhotos(filters: PhotoListQuery) {
   if (filters.available !== undefined) {
     where.available = filters.available;
   }
+  if (filters.code) {
+    where.code = { contains: filters.code };
+  }
 
   return prisma.photo.findMany({
     where,

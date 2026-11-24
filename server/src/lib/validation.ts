@@ -203,6 +203,7 @@ export type PhotoUpdateInput = {
 export type PhotoListQuery = {
   eventId?: string;
   available?: boolean;
+  code?: string;
 };
 
 const PHOTO_CODE_PATTERN = /^[A-Z0-9_-]{3,40}$/;
@@ -301,6 +302,10 @@ export function parsePhotoListQuery(query: Record<string, unknown>): PhotoListQu
 
   if (typeof query.available === "string" && query.available !== "") {
     filters.available = readBoolean(query.available, "available");
+  }
+
+  if (typeof query.code === "string" && query.code.trim() !== "") {
+    filters.code = query.code.trim();
   }
 
   return filters;

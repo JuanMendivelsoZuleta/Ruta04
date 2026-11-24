@@ -1,4 +1,6 @@
 import "./lib/env";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import express from "express";
 import { errorHandler, notFoundHandler } from "./lib/http";
 import { prisma } from "./lib/prisma";
@@ -32,6 +34,27 @@ app.use("/api/events", eventPhotosRouter);
 app.use("/api/events", eventsRouter);
 app.use("/api/photos", photosRouter);
 app.use("/api/orders", ordersRouter);
+
+// Frontend compilado (producción): sirve client/dist y resuelve rutas SPA.
+const CLIENT_DIST = path.resolve(__dirname, "../../client/dist");
+if (existsSync(CLIENT_DIST)) {
+  app.use(express.static(CLIENT_DIST));
+  app.use((req, res, next) => {
+    if (req.method !== "GET") {
+      next();
+      return;
+    }
+    if (req.path.startsWith("/api") || req.path.startsWith(UPLOAD_URL_PREFIX)) {
+      next();
+      return;
+    }
+    if (!req.headers.accept?.includes("text/html")) {
+      next();
+      return;
+    }
+    res.sendFile(path.join(CLIENT_DIST, "index.html"));
+  });
+}
 
 app.use(notFoundHandler);
 app.use(errorHandler);

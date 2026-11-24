@@ -97,10 +97,11 @@ export const eventsApi = {
 
 export const photosApi = {
   get: (id: string) => api.get<ApiItem<Photo>>(`/api/photos/${id}`),
-  list: (params: { eventId?: string; available?: boolean } = {}) => {
+  list: (params: { eventId?: string; available?: boolean; code?: string } = {}) => {
     const search = new URLSearchParams()
     if (params.eventId) search.set('eventId', params.eventId)
     if (params.available !== undefined) search.set('available', String(params.available))
+    if (params.code) search.set('code', params.code)
     const query = search.toString()
     return api.get<ApiList<Photo>>(`/api/photos${query ? `?${query}` : ''}`)
   },
