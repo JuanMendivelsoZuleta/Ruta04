@@ -182,3 +182,126 @@ export function parseListQuery(query: Record<string, unknown>): EventListQuery {
 
   return filters;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Fotografías                                                                */
+/* ------------------------------------------------------------------------- */
+
+/** Campos de texto recibidos junto a la subida multipart. */
+export type PhotoUploadFields = {
+  price: number;
+  code?: string;
+};
+
+/** Datos validados para actualizar una fotografía. */
+export type PhotoUpdateInput = {
+  price?: number;
+  available?: boolean;
+};
+
+/** Filtros del listado de fotografías. */
+export type PhotoListQuery = {
+  eventId?: string;
+  available?: boolean;
+};
+
+const PHOTO_CODE_PATTERN = /^[A-Z0-9_-]{3,40}$/;
+
+function readInteger(
+  value: unknown,
+  field: string,
+  options: { required: boolean },
+): number | undefined {
+  if (value === undefined || value === null || value === "") {
+    if (options.required) {
+      throw badRequest([`${field} es obligatorio`]);
+    }
+    return undefined;
+  }
+  if (typeof value !== "string" && typeof value !== "number") {
+    throw badRequest([`${field} debe ser un número entero`]);
+  }
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw badRequest([`${field} debe ser un entero mayor o igual a 0`]);
+  }
+  return parsed;
+}
+
+function readPhotoCode(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw badRequest(["code debe ser texto"]);
+  }
+  const normalized = value.trim().toUpperCase();
+  if (!PHOTO_CODE_PATTERN.test(normalized)) {
+    throw badRequest([
+      "code debe tener entre 3 y 40 caracteres alfanuméricos, guion o guion bajo",
+    ]);
+  }
+  return normalized;
+}
+
+function readBoolean(value: unknown, field: string): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  throw badRequest([`${field} debe ser true o false`]);
+}
+
+/** Valida los campos de texto de la subida de fotografías. */
+export function parsePhotoUploadFields(body: unknown): PhotoUploadFields {
+  const data = requireRecord(body);
+  const price = readInteger(data.price, "price", { required: true });
+  if (price === undefined) {
+    throw badRequest(["price es obligatorio"]);
+  }
+  const code = readPhotoCode(data.code);
+  return code === undefined ? { price } : { price, code };
+}
+
+/** Valida la edición parcial de precio y disponibilidad. */
+export function parsePhotoUpdate(body: unknown): PhotoUpdateInput {
+  const data = requireRecord(body);
+  const input: PhotoUpdateInput = {};
+
+  if ("price" in data) {
+    const price = readInteger(data.price, "price", { required: true });
+    if (price === undefined) {
+      throw badRequest(["price es obligatorio"]);
+    }
+    input.price = price;
+  }
+
+  if ("available" in data) {
+    input.available = readBoolean(data.available, "available");
+  }
+
+  if (Object.keys(input).length === 0) {
+    throw badRequest(["Debe enviar al menos un campo para actualizar (price o available)"]);
+  }
+  return input;
+}
+
+/** Valida los filtros del listado de fotografías. */
+export function parsePhotoListQuery(query: Record<string, unknown>): PhotoListQuery {
+  const filters: PhotoListQuery = {};
+
+  if (typeof query.eventId === "string" && query.eventId.trim() !== "") {
+    filters.eventId = query.eventId.trim();
+  }
+
+  if (typeof query.available === "string" && query.available !== "") {
+    filters.available = readBoolean(query.available, "available");
+  }
+
+  return filters;
+}
