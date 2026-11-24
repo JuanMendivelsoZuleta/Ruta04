@@ -23,7 +23,8 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
-  if (init.body && !headers.has('Content-Type')) {
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
+  if (init.body && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
 
@@ -63,6 +64,18 @@ export const api = {
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  upload: <T>(path: string, body: FormData) =>
+    request<T>(path, { method: 'POST', body }),
+}
+
+export type EventPayload = {
+  name: string
+  sportCategory: string
+  location: string
+  date: string
+  description?: string | null
+  coverImage?: string | null
+  status?: string
 }
 
 export const eventsApi = {
@@ -75,6 +88,11 @@ export const eventsApi = {
   },
   get: (id: string) => api.get<ApiItem<EventItem>>(`/api/events/${id}`),
   photos: (id: string) => api.get<ApiList<Photo>>(`/api/events/${id}/photos`),
+  create: (input: EventPayload) =>
+    api.post<ApiItem<EventItem>>('/api/events', input),
+  update: (id: string, input: Partial<EventPayload>) =>
+    api.patch<ApiItem<EventItem>>(`/api/events/${id}`, input),
+  remove: (id: string) => api.delete<void>(`/api/events/${id}`),
 }
 
 export const photosApi = {
@@ -86,6 +104,11 @@ export const photosApi = {
     const query = search.toString()
     return api.get<ApiList<Photo>>(`/api/photos${query ? `?${query}` : ''}`)
   },
+  update: (id: string, input: { price?: number; available?: boolean }) =>
+    api.patch<ApiItem<Photo>>(`/api/photos/${id}`, input),
+  remove: (id: string) => api.delete<void>(`/api/photos/${id}`),
+  upload: (eventId: string, form: FormData) =>
+    api.upload<ApiList<Photo>>(`/api/events/${eventId}/photos`, form),
 }
 
 export const ordersApi = {
