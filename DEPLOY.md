@@ -76,15 +76,19 @@ Profesor
 2. Crea un **proyecto** (p. ej. `ruta04`) y añade un **servicio desde tu repositorio**:
    - Repositorio: `JuanMendivelsoZuleta/Ruta04`, rama `main`.
    - Suga detecta el `Dockerfile` de la raíz y compila `server/`.
-3. Variables de entorno del servicio (las mismas de `server/.env`):
+3. Variables de entorno del servicio, en la pestaña **Env Vars** (las mismas de `server/.env`):
    - `DATABASE_URL` = cadena directa de Neon
    - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
    - `CORS_ORIGIN` = `http://localhost:5173` (temporal; se ajusta en el Paso 6)
    - `NODE_ENV` = `production`
-4. Deploy y espera a que el servicio esté **Live**. Abre:
+   > Guardar **no** aplica los cambios: pulsa **Apply** (arriba a la derecha) para desplegarlos.
+4. En **Config → Public Networking**, asegura que el endpoint HTTPS apunte al puerto **4000**
+   (la app también toma `SUGA_PUBLIC_TARGET_PORT` para evitar desajustes).
+5. Pulsa **Apply** y espera a que el servicio esté **Live**. Abre:
    `https://<tu-servicio>.suga.app/api/health` → debe responder `{"status":"ok","database":"connected"}`.
 
-> El contenedor ejecuta `prisma migrate deploy` al arrancar (idempotente) y luego el servidor.
+> Las migraciones se aplican una vez desde tu máquina con `npm --prefix server run db:deploy`
+> (el contenedor no las ejecuta al arrancar, para ahorrar memoria en el plan Free).
 
 ### Opción B: Render (solo si no te pide tarjeta)
 

@@ -22,5 +22,6 @@ RUN npx prisma generate && npm run build
 ENV NODE_ENV=production
 EXPOSE 4000
 
-# Aplica migraciones pendientes (idempotente) y arranca el servidor.
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Arranca el servidor. Las migraciones se aplican aparte (npm run db:deploy)
+# para no cargar la CLI de Prisma en un contenedor de 256 MB en cada arranque.
+CMD ["node", "dist/index.js"]

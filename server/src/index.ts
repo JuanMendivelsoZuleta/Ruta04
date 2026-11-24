@@ -2,10 +2,15 @@ import "./lib/env";
 import { app } from "./app";
 import { prisma } from "./lib/prisma";
 
-const PORT = Number(process.env.PORT ?? 4000);
+// Suga expone `SUGA_PUBLIC_TARGET_PORT` con el puerto interno al que enruta el
+// tráfico público. Usarlo (junto con PORT como respaldo) evita desajustes de
+// puerto entre la app y el proxy del hosting.
+const PORT = Number(
+  process.env.PORT ?? process.env.SUGA_PUBLIC_TARGET_PORT ?? 4000,
+);
 
-const server = app.listen(PORT, () => {
-  console.log(`API Ruta 04 escuchando en http://localhost:${PORT}`);
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`API Ruta 04 escuchando en 0.0.0.0:${PORT}`);
 });
 
 async function shutdown(signal: string): Promise<void> {
