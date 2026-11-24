@@ -10,7 +10,9 @@ RUN apt-get update -y \
 WORKDIR /app/server
 
 # Dependencias (incluye dev para compilar TypeScript y generar Prisma).
+# Se copia el schema antes para que el postinstall de Prisma lo encuentre.
 COPY server/package*.json ./
+COPY server/prisma ./prisma
 RUN npm install --include=dev
 
 # Código y compilación.
