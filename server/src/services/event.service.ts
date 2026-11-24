@@ -14,9 +14,10 @@ export function listEvents(filters: EventListQuery) {
   const where: Prisma.EventWhereInput = {};
 
   if (filters.q) {
+    // Búsqueda insensible a mayúsculas/minúsculas (PostgreSQL).
     where.OR = [
-      { name: { contains: filters.q } },
-      { location: { contains: filters.q } },
+      { name: { contains: filters.q, mode: "insensitive" } },
+      { location: { contains: filters.q, mode: "insensitive" } },
     ];
   }
 
